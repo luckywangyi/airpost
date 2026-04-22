@@ -38,6 +38,11 @@ const router = createRouter({
       component: () => import('@/views/Analytics.vue'),
     },
     {
+      path: '/pipeline',
+      name: 'pipeline',
+      component: () => import('@/views/Pipeline.vue'),
+    },
+    {
       path: '/scheduler',
       name: 'scheduler',
       component: () => import('@/views/Scheduler.vue'),

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "XHS Assistant",
+  "productName": "Airpost",
   "version": "0.1.0",
-  "identifier": "com.xhs.assistant",
+  "identifier": "com.airpost.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,24 +13,20 @@
     "windows": [
       {
         "label": "main",
-        "title": "小红书矩阵运营助手",
+        "title": "Airpost",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true,
+        "decorations": false,
         "shadow": true,
         "transparent": false
       }
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
     }
   },
   "bundle": {

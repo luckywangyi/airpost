@@ -1,4 +1,5 @@
 import sys
+import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,9 +9,14 @@ from core.account import account_router
 from core.publisher import publisher_router
 from core.commenter import commenter_router
 from core.scraper import scraper_router
+from core.analyzer import analyzer_router
+from core.hot_topics import hot_topics_router
+from core.pipeline import pipeline_router
 from ai.content_gen import ai_router
 
-app = FastAPI(title="XHS Assistant Sidecar")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+
+app = FastAPI(title="Airpost Sidecar", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +30,9 @@ app.include_router(account_router, prefix="/account", tags=["account"])
 app.include_router(publisher_router, prefix="/publish", tags=["publish"])
 app.include_router(commenter_router, prefix="/comment", tags=["comment"])
 app.include_router(scraper_router, prefix="/scraper", tags=["scraper"])
+app.include_router(analyzer_router, prefix="/analyzer", tags=["analyzer"])
+app.include_router(hot_topics_router, prefix="/trending", tags=["trending"])
+app.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
 app.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 

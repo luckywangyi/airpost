@@ -2,12 +2,13 @@
 import { ref, onMounted } from 'vue'
 import { useAccountStore, type Account } from '@/stores/accounts'
 import { useSidecar } from '@/composables/useSidecar'
-import { Plus, Wifi, WifiOff, Trash2, RefreshCw } from 'lucide-vue-next'
+import { Plus, Wifi, WifiOff, Trash2, RefreshCw, Loader2 } from 'lucide-vue-next'
 
-const { callSidecar } = useSidecar()
+const { callSidecar, lastError } = useSidecar()
 const accountStore = useAccountStore()
 const showAddDialog = ref(false)
 const loginLoading = ref<string | null>(null)
+const statusMessage = ref('')
 const newNickname = ref('')
 const newProxy = ref('')
 
@@ -42,21 +43,26 @@ async function handleDelete(id: string) {
 
 async function handleLogin(account: Account) {
   loginLoading.value = account.id
+  statusMessage.value = '正在打开登录页面...'
   try {
     const result = await callSidecar<{ success: boolean; message: string; nickname: string }>('/account/login', {
       body: { account_id: account.id, proxy: account.proxy },
     })
     if (result.success) {
+      statusMessage.value = '登录成功!'
       await accountStore.updateAccount({
         ...account,
         last_login: new Date().toISOString(),
         nickname: result.nickname || account.nickname,
       })
+    } else {
+      statusMessage.value = result.message || '登录失败'
     }
-  } catch (e) {
-    console.error('Login failed:', e)
+  } catch (e: any) {
+    statusMessage.value = e?.message || '登录失败，请确保 Sidecar 已启动'
   } finally {
     loginLoading.value = null
+    setTimeout(() => { statusMessage.value = '' }, 5000)
   }
 }
 
@@ -92,6 +98,10 @@ function statusBadge(status: string) {
       </button>
     </header>
 
+    <div v-if="statusMessage" class="status-bar" :class="{ error: statusMessage.includes('失败') || statusMessage.includes('未运行') }">
+      {{ statusMessage }}
+    </div>
+
     <div class="account-grid">
       <div
         v-for="account in accountStore.accounts"
@@ -124,8 +134,15 @@ function statusBadge(status: string) {
         </div>
 
         <div class="card-actions">
-          <button class="btn-icon" title="登录" @click="handleLogin(account)" :disabled="loginLoading === account.id">
-            <Wifi :size="15" :stroke-width="1.5" />
+          <button
+            class="btn-icon"
+            :class="{ loading: loginLoading === account.id }"
+            title="登录"
+            @click="handleLogin(account)"
+            :disabled="loginLoading === account.id"
+          >
+            <Loader2 v-if="loginLoading === account.id" :size="15" :stroke-width="1.5" class="spin" />
+            <Wifi v-else :size="15" :stroke-width="1.5" />
           </button>
           <button class="btn-icon" title="检查状态" @click="handleCheckStatus(account)">
             <RefreshCw :size="15" :stroke-width="1.5" />
@@ -423,5 +440,39 @@ function statusBadge(status: string) {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 18px;
+}
+
+.status-bar {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(52, 199, 89, 0.1);
+  color: var(--color-success);
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.status-bar.error {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--color-danger);
+}
+
+.btn-icon.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 </style>

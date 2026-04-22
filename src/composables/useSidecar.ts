@@ -1,18 +1,31 @@
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
-const sidecarUrl = ref('')
+const DEFAULT_PORT = 18765
+const sidecarUrl = ref(`http://127.0.0.1:${DEFAULT_PORT}`)
 const sidecarRunning = ref(false)
+const lastError = ref('')
 
 export function useSidecar() {
   async function start(port?: number) {
+    const p = port || DEFAULT_PORT
+    sidecarUrl.value = `http://127.0.0.1:${p}`
+
     try {
-      await invoke('start_sidecar', { port })
-      sidecarUrl.value = await invoke<string>('get_sidecar_url')
+      await invoke('start_sidecar', { port: p })
       sidecarRunning.value = true
-    } catch (e) {
-      console.error('Failed to start sidecar:', e)
-      throw e
+    } catch {
+      // Tauri command failed (e.g. dev mode path issue) - check if sidecar is already running externally
+      try {
+        const resp = await fetch(`${sidecarUrl.value}/health`)
+        if (resp.ok) {
+          sidecarRunning.value = true
+          return
+        }
+      } catch {
+        // sidecar not reachable
+      }
+      console.warn('Sidecar not available. Start it manually: cd sidecar && python main.py')
     }
   }
 
@@ -20,15 +33,26 @@ export function useSidecar() {
     try {
       await invoke('stop_sidecar')
       sidecarRunning.value = false
-    } catch (e) {
-      console.error('Failed to stop sidecar:', e)
+    } catch {
+      console.warn('Failed to stop sidecar via Tauri')
     }
   }
 
-  async function ensureRunning() {
-    if (!sidecarRunning.value) {
-      await start()
+  async function ensureRunning(): Promise<string> {
+    if (sidecarRunning.value) return sidecarUrl.value
+
+    // Try health check on default URL first (manually started sidecar)
+    try {
+      const resp = await fetch(`${sidecarUrl.value}/health`)
+      if (resp.ok) {
+        sidecarRunning.value = true
+        return sidecarUrl.value
+      }
+    } catch {
+      // not running, try to start via Tauri
     }
+
+    await start()
     return sidecarUrl.value
   }
 
@@ -37,6 +61,12 @@ export function useSidecar() {
     options: { method?: string; body?: unknown } = {},
   ): Promise<T> {
     const base = await ensureRunning()
+
+    if (!sidecarRunning.value) {
+      lastError.value = 'Sidecar 未运行，请先在终端启动：cd sidecar && python main.py'
+      throw new Error(lastError.value)
+    }
+
     const url = `${base}${path}`
     const resp = await fetch(url, {
       method: options.method || 'POST',
@@ -44,14 +74,18 @@ export function useSidecar() {
       body: options.body ? JSON.stringify(options.body) : undefined,
     })
     if (!resp.ok) {
-      throw new Error(`Sidecar request failed: ${resp.status}`)
+      const text = await resp.text().catch(() => '')
+      lastError.value = `请求失败 (${resp.status}): ${text}`
+      throw new Error(lastError.value)
     }
+    lastError.value = ''
     return resp.json()
   }
 
   return {
     sidecarUrl,
     sidecarRunning,
+    lastError,
     start,
     stop,
     ensureRunning,

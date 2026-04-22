@@ -1,12 +1,14 @@
 node_modules/
 dist/
+src-tauri/target/
 data/*.db
 data/*.json
 data/accounts/*.json
 data/media/*
-!data/accounts/.gitkeep
-!data/media/.gitkeep
-!data/.gitignore
+data/analysis/*.json
+data/pipeline/*.json
+data/pipeline/*.jsonl
+!data/**/.gitkeep
 *.log
 .DS_Store
 Thumbs.db

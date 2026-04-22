@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useContentStore, type ContentItem } from '@/stores/content'
 import { useAccountStore } from '@/stores/accounts'
 import { useSidecar } from '@/composables/useSidecar'
-import { ArrowLeft, Sparkles, Upload, X } from 'lucide-vue-next'
+import { ArrowLeft, Sparkles, Upload, X, TrendingUp } from 'lucide-vue-next'
 
 const router = useRouter()
 const { callSidecar } = useSidecar()
@@ -18,6 +18,8 @@ const selectedAccount = ref('')
 const scheduledAt = ref('')
 const imagePaths = ref<string[]>([])
 const generating = ref(false)
+const contentScore = ref(0)
+const scoreBreakdown = ref<Record<string, number>>({})
 
 onMounted(() => {
   accountStore.fetchAccounts()
@@ -57,14 +59,21 @@ async function handleAiGenerate() {
       title: string
       body: string
       tags: string[]
+      score: number
+      score_breakdown: Record<string, number>
       message?: string
     }>('/ai/generate', {
-      body: { topic: title.value.trim() },
+      body: {
+        topic: title.value.trim(),
+        account_id: selectedAccount.value || undefined,
+      },
     })
     if (result.success) {
       title.value = result.title
       body.value = result.body
       tags.value = result.tags.map(t => `#${t}`).join(' ')
+      contentScore.value = result.score
+      scoreBreakdown.value = result.score_breakdown || {}
     }
   } catch (e) {
     console.error('AI generation failed:', e)
@@ -163,6 +172,24 @@ async function handlePublishNow() {
         <div class="form-field">
           <label>定时发布</label>
           <input v-model="scheduledAt" type="datetime-local" />
+        </div>
+
+        <!-- Content Score Panel -->
+        <div v-if="contentScore > 0" class="score-panel">
+          <div class="score-header">
+            <TrendingUp :size="14" :stroke-width="1.5" />
+            <span>内容评分</span>
+          </div>
+          <div class="score-circle" :class="{ good: contentScore >= 80, mid: contentScore >= 60 && contentScore < 80, low: contentScore < 60 }">
+            <span class="score-number">{{ contentScore }}</span>
+            <span class="score-max">/100</span>
+          </div>
+          <div class="score-details">
+            <div v-for="(val, key) in scoreBreakdown" :key="key" class="score-item">
+              <span class="score-key">{{ key }}</span>
+              <span class="score-val">+{{ val }}</span>
+            </div>
+          </div>
         </div>
       </aside>
     </div>
@@ -366,5 +393,68 @@ async function handlePublishNow() {
 .upload-placeholder:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.score-panel {
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 8px;
+}
+
+.score-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.score-circle {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.score-circle.good .score-number { color: var(--color-success); }
+.score-circle.mid .score-number { color: var(--color-warning); }
+.score-circle.low .score-number { color: var(--color-danger); }
+
+.score-number {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.score-max {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.score-details {
+  border-top: 0.5px solid var(--color-border);
+  padding-top: 8px;
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.score-key {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.score-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-success);
 }
 </style>

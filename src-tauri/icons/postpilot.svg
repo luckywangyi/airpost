@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4EAAFF"/>
+      <stop offset="100%" stop-color="#1668DC"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <g transform="translate(512,512)">
+    <!-- Arrow shaft: lower-left to upper-right -->
+    <line x1="-250" y1="250" x2="220" y2="-220"
+      stroke="white" stroke-width="105" stroke-linecap="round"/>
+    <!-- Arrowhead: horizontal bar from tip going left -->
+    <line x1="220" y1="-220" x2="-60" y2="-220"
+      stroke="white" stroke-width="105" stroke-linecap="round"/>
+    <!-- Arrowhead: vertical bar from tip going down -->
+    <line x1="220" y1="-220" x2="220" y2="60"
+      stroke="white" stroke-width="105" stroke-linecap="round"/>
+  </g>
+</svg>

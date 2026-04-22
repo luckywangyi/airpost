@@ -8,6 +8,7 @@ import {
   BarChart3,
   Clock,
   Settings2,
+  Zap,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -29,8 +30,9 @@ const navGroups = [
     ],
   },
   {
-    label: '分析',
+    label: '智能',
     items: [
+      { name: '智能管线', icon: Zap, path: '/pipeline' },
       { name: '数据分析', icon: BarChart3, path: '/analytics' },
       { name: '任务调度', icon: Clock, path: '/scheduler' },
     ],
@@ -92,9 +94,10 @@ function navigate(path: string) {
 }
 
 .drag-region {
-  height: 30px;
-  min-height: 30px;
+  height: 38px;
+  min-height: 38px;
   -webkit-app-region: drag;
+  border-bottom: 0.5px solid var(--color-border);
 }
 
 .nav-content {

@@ -38,8 +38,9 @@ pub fn run() {
             let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
             let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().cloned().unwrap())
                 .menu(&tray_menu)
-                .tooltip("小红书矩阵运营助手")
+                .tooltip("Airpost")
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
                         "show" => {

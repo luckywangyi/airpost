@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAccountStore } from '@/stores/accounts'
 import { useContentStore } from '@/stores/content'
 import { useAnalyticsStore } from '@/stores/analytics'
-import { Users, FileText, Send, MessageSquare, Activity } from 'lucide-vue-next'
+import { useSidecar } from '@/composables/useSidecar'
+import { Users, FileText, Send, MessageSquare, Activity, Zap } from 'lucide-vue-next'
 
+const router = useRouter()
+const { callSidecar, sidecarRunning } = useSidecar()
 const accountStore = useAccountStore()
 const contentStore = useContentStore()
 const analyticsStore = useAnalyticsStore()
+
+const pipelineGenerated = ref(0)
+const pipelinePublished = ref(0)
 
 const accountCount = computed(() => accountStore.accounts.length)
 const pendingContent = computed(() => contentStore.queue.filter(c => c.status === 'pending').length)
@@ -21,8 +28,21 @@ const statCards = computed(() => [
   { label: '账号总数', value: accountCount.value, icon: Users, color: 'var(--color-info)' },
   { label: '待发布内容', value: pendingContent.value, icon: FileText, color: 'var(--color-warning)' },
   { label: '今日已发布', value: publishedToday.value, icon: Send, color: 'var(--color-success)' },
-  { label: '待回复评论', value: pendingComments.value, icon: MessageSquare, color: 'var(--color-primary)' },
+  { label: '管线已生成', value: pipelineGenerated.value, icon: Zap, color: 'var(--color-warning)' },
 ])
+
+async function fetchPipelineStats() {
+  if (accountStore.accounts.length === 0) return
+  for (const acc of accountStore.accounts) {
+    try {
+      const resp = await callSidecar<{ running: boolean; generated_count: number; published_count: number }>(
+        `/pipeline/status/${acc.id}`, { method: 'GET' }
+      )
+      pipelineGenerated.value += resp.generated_count
+      pipelinePublished.value += resp.published_count
+    } catch { /* ignore */ }
+  }
+}
 
 onMounted(async () => {
   await Promise.all([
@@ -30,6 +50,7 @@ onMounted(async () => {
     contentStore.fetchQueue(),
     analyticsStore.fetchTaskLogs(20),
   ])
+  fetchPipelineStats()
 })
 </script>
 
@@ -50,6 +71,19 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <section class="quick-actions">
+      <button class="action-card" @click="router.push('/pipeline')">
+        <Zap :size="20" :stroke-width="1.5" style="color: var(--color-warning)" />
+        <span class="action-label">运行智能管线</span>
+        <span class="action-desc">数据采集 → 分析 → 选题 → 生成</span>
+      </button>
+      <button class="action-card" @click="router.push('/content/editor')">
+        <FileText :size="20" :stroke-width="1.5" style="color: var(--color-primary)" />
+        <span class="action-label">新建内容</span>
+        <span class="action-desc">AI 辅助创作笔记</span>
+      </button>
+    </section>
 
     <section class="section">
       <h2 class="section-title">
@@ -230,5 +264,43 @@ onMounted(async () => {
   color: var(--color-text-tertiary);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.action-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.action-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-top: 4px;
+}
+
+.action-desc {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 </style>

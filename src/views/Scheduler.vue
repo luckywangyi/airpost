@@ -76,6 +76,7 @@ onMounted(() => {
 
 function typeLabel(type: string) {
   switch (type) {
+    case 'pipeline': return '智能管线'
     case 'publish': return '定时发布'
     case 'check_comments': return '评论巡检'
     case 'collect_stats': return '数据采集'
@@ -129,6 +130,7 @@ function typeLabel(type: string) {
           <div class="form-field">
             <label>任务类型</label>
             <select v-model="newJobType">
+              <option value="pipeline">智能管线</option>
               <option value="publish">定时发布</option>
               <option value="check_comments">评论巡检</option>
               <option value="collect_stats">数据采集</option>

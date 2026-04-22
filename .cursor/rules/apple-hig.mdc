@@ -1,5 +1,5 @@
 ---
-description: Enforce Apple Human Interface Guidelines for XHS Assistant UI
+description: Enforce Apple Human Interface Guidelines for Airpost UI
 globs: ["src/**/*.vue", "src/**/*.css", "src/**/*.ts", "tailwind.config.js"]
 alwaysApply: false
 ---
