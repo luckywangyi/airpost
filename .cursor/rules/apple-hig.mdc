@@ -1,0 +1,46 @@
+---
+description: Enforce Apple Human Interface Guidelines for XHS Assistant UI
+globs: ["src/**/*.vue", "src/**/*.css", "src/**/*.ts", "tailwind.config.js"]
+alwaysApply: false
+---
+
+# Apple HIG 设计规范
+
+## 字体
+
+- 字体栈必须以系统字体开头：`-apple-system, BlinkMacSystemFont, 'SF Pro Text'`
+- 禁止在字体栈首位放置第三方字体（Inter、Roboto 等）
+- 中文 fallback 使用 `PingFang SC`（macOS）和 `Microsoft YaHei UI`（Windows）
+
+## 磨砂/毛玻璃效果
+
+- **窗口级元素**（`.sidebar`、`.main-content`）禁止使用 CSS `backdrop-filter`
+- 磨砂效果完全依赖 Tauri 原生 vibrancy（Windows Mica / macOS NSVisualEffectMaterial）
+- CSS 只提供半透明背景色（rgba opacity ≤ 0.55）让原生效果透出
+- **浮层弹窗**（dialog-overlay、dropdown 等非窗口级组件）允许使用 `backdrop-filter`
+
+## 渐变色
+
+- 禁止 `linear-gradient` 用于背景、按钮、进度条等 UI 元素
+- 所有填充色使用单色（solid color）
+
+## 投影（box-shadow）
+
+- 窗口投影由 OS 管理（Tauri `shadow: true`），CSS 不应在窗口级元素添加 `box-shadow`
+- 卡片/按钮投影上限：`0 0.5px 1px rgba(0,0,0,0.04)`
+- 禁止 hover 时大幅提升阴影（如 shadow-sm → shadow-md）
+
+## 图标
+
+- 统一使用 Lucide Icons，`stroke-width: 1.5`
+- 禁止使用 Emoji 替代图标
+- 禁止导入未使用的图标组件
+
+## 窗口
+
+- 所有 async Tauri API 调用必须包裹 try/catch，避免静默失败
+
+## Vue 生命周期
+
+- `onUnmounted` 必须在 `setup()` 同步阶段注册，不可放在 `await` 之后
+- 使用外部变量持有 unlisten 回调，在同步注册的 `onUnmounted` 中清理

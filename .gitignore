@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/*.db
+data/*.json
+data/accounts/*.json
+data/media/*
+!data/accounts/.gitkeep
+!data/media/.gitkeep
+!data/.gitignore
+*.log
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+sidecar/.venv/
