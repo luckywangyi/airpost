@@ -20,6 +20,8 @@ class GenerateRequest(BaseModel):
     base_url: Optional[str] = None
     model: str = "gpt-4o-mini"
     trending_titles: list[str] = []
+    direction_name: str = ""
+    direction_keywords: list[str] = []
 
 
 class GenerateResponse(BaseModel):
@@ -154,6 +156,13 @@ async def generate_content(req: GenerateRequest):
 
         data_context = _build_data_context(req.account_id, req.trending_titles)
 
+        direction_context = ""
+        if req.direction_name:
+            direction_context = f"\n内容方向：{req.direction_name}"
+            if req.direction_keywords:
+                direction_context += f"\n方向关键词：{', '.join(req.direction_keywords)}"
+            direction_context += "\n请确保生成的内容紧扣该内容方向，体现垂直领域的专业性。\n"
+
         prompt = f"""你是一个顶级小红书内容创作专家，擅长写出高互动率的爆款笔记。
 
 请根据以下要求生成一篇小红书笔记：
@@ -162,7 +171,7 @@ async def generate_content(req: GenerateRequest):
 风格：{req.style}
 语气：{req.tone}
 字数：约{req.word_count}字
-"""
+{direction_context}"""
 
         if data_context:
             prompt += f"""
@@ -226,10 +235,17 @@ async def suggest_topics(req: GenerateRequest):
         data_context = _build_data_context(req.account_id, req.trending_titles)
         data_driven = bool(data_context.strip())
 
+        direction_hint = ""
+        if req.direction_name:
+            direction_hint = f"\n内容方向约束：{req.direction_name}"
+            if req.direction_keywords:
+                direction_hint += f"\n方向关键词：{', '.join(req.direction_keywords)}"
+            direction_hint += "\n所有选题必须紧扣该内容方向，保持账号垂直度。\n"
+
         prompt = f"""你是小红书运营数据分析专家。请基于以下数据推荐 5 个高潜力选题：
 
 目标领域/主题方向：{req.topic}
-"""
+{direction_hint}"""
         if data_context:
             prompt += f"""
 {data_context}

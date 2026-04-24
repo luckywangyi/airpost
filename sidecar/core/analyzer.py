@@ -24,6 +24,7 @@ class NotePerformance(BaseModel):
     word_count: int = 0
     has_emoji: bool = False
     title_length: int = 0
+    direction_id: str = ""
 
     def calc_engagement(self):
         total_interact = self.likes + self.collects + self.comments + self.shares
@@ -159,6 +160,28 @@ async def ingest_stats(account_id: str, stats: list[dict]):
         added += 1
 
     _save_history(account_id, existing)
+
+    # Update direction-level stats if strategy exists
+    try:
+        from .strategy import _load_strategy, _save_strategy, _match_note_to_direction
+        strategy = _load_strategy(account_id)
+        if strategy.directions:
+            for direction in strategy.directions:
+                matched = [
+                    n for n in existing
+                    if _match_note_to_direction(n.title, n.tags, direction)
+                ]
+                if matched:
+                    direction.avg_views = round(
+                        sum(n.views for n in matched) / len(matched), 1
+                    )
+                    direction.avg_engagement = round(
+                        sum(n.engagement_rate for n in matched) / len(matched), 2
+                    )
+            _save_strategy(strategy)
+    except Exception:
+        pass
+
     return {"success": True, "added": added, "total": len(existing)}
 
 

@@ -17,18 +17,24 @@ const analyticsStore = useAnalyticsStore()
 const accountStore = useAccountStore()
 const selectedAccount = ref<string>('')
 const collecting = ref(false)
+const collectMessage = ref('')
 
 onMounted(async () => {
   await accountStore.fetchAccounts()
+  if (accountStore.accounts.length > 0) {
+    selectedAccount.value = accountStore.accounts[0].id
+  }
   await analyticsStore.fetchStats()
 })
 
 async function handleCollectData() {
   if (!selectedAccount.value) return
   collecting.value = true
+  collectMessage.value = ''
   try {
     const result = await callSidecar<{
       success: boolean
+      message: string
       stats: Array<{
         note_url: string
         title: string
@@ -40,14 +46,45 @@ async function handleCollectData() {
       }>
     }>(`/scraper/collect_stats?account_id=${selectedAccount.value}`)
 
-    if (result.success && result.stats.length > 0) {
-      // Store will be refreshed from DB in production; for now just update local
-      await analyticsStore.fetchStats(selectedAccount.value)
+    if (!result.success) {
+      collectMessage.value = result.message || '采集失败'
+      return
     }
-  } catch (e) {
+
+    if (result.stats.length > 0) {
+      for (const stat of result.stats) {
+        try {
+          await invoke('add_note_stats', {
+            stats: {
+              id: `${selectedAccount.value}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              account_id: selectedAccount.value,
+              note_url: stat.note_url || '',
+              title: stat.title || '',
+              views: stat.views || 0,
+              likes: stat.likes || 0,
+              collects: stat.collects || 0,
+              comments: stat.comments || 0,
+              shares: stat.shares || 0,
+              collected_at: new Date().toISOString(),
+            },
+          })
+        } catch (e) {
+          console.error('Failed to save stat:', e)
+        }
+      }
+      await analyticsStore.fetchStats(selectedAccount.value)
+      collectMessage.value = `成功采集 ${result.stats.length} 条笔记数据`
+    } else {
+      collectMessage.value = result.message || '未找到笔记数据'
+    }
+  } catch (e: any) {
+    collectMessage.value = e?.message || '采集失败，请确保 Sidecar 已启动'
     console.error('Failed to collect data:', e)
   } finally {
     collecting.value = false
+    if (collectMessage.value) {
+      setTimeout(() => { collectMessage.value = '' }, 8000)
+    }
   }
 }
 
@@ -117,6 +154,10 @@ const topNotes = computed(() =>
         </button>
       </div>
     </header>
+
+    <div v-if="collectMessage" class="collect-msg" :class="{ error: collectMessage.includes('失败') || collectMessage.includes('未登录') }">
+      {{ collectMessage }}
+    </div>
 
     <div class="stat-row">
       <div class="stat-card">
@@ -229,6 +270,21 @@ const topNotes = computed(() =>
 .btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.collect-msg {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(52, 199, 89, 0.1);
+  color: var(--color-success);
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.collect-msg.error {
+  background: rgba(255, 149, 0, 0.1);
+  color: var(--color-warning);
 }
 
 .stat-row {

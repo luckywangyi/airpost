@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { Save, Key, Globe, Clock, Cpu } from 'lucide-vue-next'
+import { Save, Key, Globe, Clock, Cpu, FolderOpen, Image } from 'lucide-vue-next'
 
 interface AppSettings {
   sidecar_port: number
   auto_start: boolean
   ai_provider: string
   ai_api_key: string
+  ai_base_url: string
+  ai_model: string
   default_proxy: string | null
   comment_check_interval: number
   data_collect_interval: number
+  asset_folder: string
+  pexels_api_key: string
+}
+
+const providerPresets: Record<string, { base_url: string; model: string; placeholder: string }> = {
+  openai: { base_url: '', model: 'gpt-4o-mini', placeholder: 'sk-...' },
+  deepseek: { base_url: 'https://api.deepseek.com/v1', model: 'deepseek-chat', placeholder: 'sk-...' },
+  tongyi: { base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', placeholder: 'sk-...' },
+  custom: { base_url: '', model: '', placeholder: 'API Key' },
 }
 
 const settings = ref<AppSettings>({
@@ -18,10 +29,22 @@ const settings = ref<AppSettings>({
   auto_start: false,
   ai_provider: 'openai',
   ai_api_key: '',
+  ai_base_url: '',
+  ai_model: 'gpt-4o-mini',
   default_proxy: null,
   comment_check_interval: 30,
   data_collect_interval: 480,
+  asset_folder: '',
+  pexels_api_key: '',
 })
+
+function onProviderChange() {
+  const preset = providerPresets[settings.value.ai_provider]
+  if (preset) {
+    settings.value.ai_base_url = preset.base_url
+    settings.value.ai_model = preset.model
+  }
+}
 
 const saving = ref(false)
 const saved = ref(false)
@@ -70,8 +93,9 @@ async function handleSave() {
               <span class="label-text">AI 服务</span>
               <span class="label-desc">选择文案生成使用的 AI 服务</span>
             </div>
-            <select v-model="settings.ai_provider">
+            <select v-model="settings.ai_provider" @change="onProviderChange">
               <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
               <option value="tongyi">通义千问</option>
               <option value="custom">自定义</option>
             </select>
@@ -84,7 +108,57 @@ async function handleSave() {
             <input
               v-model="settings.ai_api_key"
               type="password"
-              placeholder="sk-..."
+              :placeholder="providerPresets[settings.ai_provider]?.placeholder || 'sk-...'"
+            />
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="label-text">API 地址</span>
+              <span class="label-desc">自定义 API Base URL（留空使用默认）</span>
+            </div>
+            <input
+              v-model="settings.ai_base_url"
+              placeholder="https://api.openai.com/v1"
+            />
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="label-text">模型</span>
+              <span class="label-desc">使用的模型名称</span>
+            </div>
+            <input
+              v-model="settings.ai_model"
+              placeholder="gpt-4o-mini"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <h2 class="group-title">
+          <Image :size="16" :stroke-width="1.5" />
+          图片获取
+        </h2>
+        <div class="group-card">
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="label-text">素材文件夹</span>
+              <span class="label-desc">本地图片文件夹路径，管线会从中随机选取配图</span>
+            </div>
+            <input
+              v-model="settings.asset_folder"
+              placeholder="C:\Pictures\xiaohongshu"
+            />
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span class="label-text">Pexels API Key</span>
+              <span class="label-desc">免费图库 API 密钥（pexels.com 免费注册）</span>
+            </div>
+            <input
+              v-model="settings.pexels_api_key"
+              type="password"
+              placeholder="可选，用于自动获取免费配图"
             />
           </div>
         </div>

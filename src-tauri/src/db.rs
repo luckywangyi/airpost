@@ -219,6 +219,37 @@ impl Database {
         Ok(items)
     }
 
+    pub fn get_content_by_id(&self, id: &str) -> Result<Option<ContentItem>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, account_id, title, body, tags, images, scheduled_at, status, created_at FROM content_queue WHERE id=?1")?;
+        let mut rows = stmt.query_map(params![id], |row| {
+            Ok(ContentItem {
+                id: row.get(0)?,
+                account_id: row.get(1)?,
+                title: row.get(2)?,
+                body: row.get(3)?,
+                tags: row.get(4)?,
+                images: row.get(5)?,
+                scheduled_at: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+            })
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn update_content(&self, item: &ContentItem) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE content_queue SET account_id=?2, title=?3, body=?4, tags=?5, images=?6, scheduled_at=?7, status=?8 WHERE id=?1",
+            params![item.id, item.account_id, item.title, item.body, item.tags, item.images, item.scheduled_at, item.status],
+        )?;
+        Ok(())
+    }
+
     pub fn update_content_status(&self, id: &str, status: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("UPDATE content_queue SET status=?2 WHERE id=?1", params![id, status])?;

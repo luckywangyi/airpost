@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useContentStore } from '@/stores/content'
+import { useContentStore, type ContentItem } from '@/stores/content'
 import { useAccountStore } from '@/stores/accounts'
+import { useSidecar } from '@/composables/useSidecar'
 import { Plus, Trash2, Send, Clock, CheckCircle2, XCircle, Image } from 'lucide-vue-next'
 
 const router = useRouter()
 const contentStore = useContentStore()
 const accountStore = useAccountStore()
+const { callSidecar } = useSidecar()
+const publishingId = ref<string | null>(null)
+const errorMessage = ref('')
 
 onMounted(async () => {
   await Promise.all([contentStore.fetchQueue(), accountStore.fetchAccounts()])
+  await contentStore.resetStalePublishing()
 })
 
 function getAccountName(id: string): string {
@@ -33,6 +38,46 @@ function imageCount(images: string): number {
   return images.split(',').filter(Boolean).length
 }
 
+async function handlePublish(item: ContentItem) {
+  publishingId.value = item.id
+  errorMessage.value = ''
+  await contentStore.updateStatus(item.id, 'publishing')
+  try {
+    const result = await callSidecar<{ success: boolean; message: string; note_url: string }>('/publish/post', {
+      body: {
+        account_id: item.account_id,
+        title: item.title,
+        body: item.body,
+        tags: item.tags.split(/\s+/).filter(Boolean).map(t => t.replace(/^#/, '')),
+        image_paths: item.images ? item.images.split(',').filter(Boolean) : [],
+      },
+    })
+    if (result.success) {
+      await contentStore.updateStatus(item.id, 'published')
+    } else {
+      errorMessage.value = result.message || '发布失败'
+      await contentStore.updateStatus(item.id, 'failed')
+      setTimeout(() => { errorMessage.value = '' }, 5000)
+    }
+  } catch (e: any) {
+    errorMessage.value = e?.message || '发布失败，请确保 Sidecar 已启动且账号已登录'
+    await contentStore.updateStatus(item.id, 'failed')
+    setTimeout(() => { errorMessage.value = '' }, 5000)
+  } finally {
+    publishingId.value = null
+  }
+}
+
+function canEdit(status: string): boolean {
+  return status !== 'published'
+}
+
+function handleEdit(item: { id: string; status: string }) {
+  if (canEdit(item.status)) {
+    router.push(`/content/editor/${item.id}`)
+  }
+}
+
 async function handleDelete(id: string) {
   await contentStore.deleteContent(id)
 }
@@ -48,6 +93,8 @@ async function handleDelete(id: string) {
       </button>
     </header>
 
+    <div v-if="errorMessage" class="error-bar">{{ errorMessage }}</div>
+
     <div v-if="contentStore.queue.length === 0" class="empty-state">
       <Image :size="40" :stroke-width="1" class="empty-icon" />
       <p>还没有内容</p>
@@ -59,6 +106,8 @@ async function handleDelete(id: string) {
         v-for="item in contentStore.queue"
         :key="item.id"
         class="content-item"
+        :class="{ clickable: canEdit(item.status) }"
+        @click="handleEdit(item)"
       >
         <div class="item-main">
           <div class="item-title">{{ item.title || '无标题' }}</div>
@@ -80,12 +129,13 @@ async function handleDelete(id: string) {
           {{ statusInfo(item.status).label }}
         </span>
 
-        <div class="item-actions">
+        <div class="item-actions" @click.stop>
           <button
-            v-if="item.status === 'pending'"
+            v-if="item.status !== 'published'"
             class="btn-icon"
             title="立即发布"
-            @click="contentStore.updateStatus(item.id, 'publishing')"
+            :disabled="publishingId === item.id"
+            @click="handlePublish(item)"
           >
             <Send :size="14" :stroke-width="1.5" />
           </button>
@@ -173,6 +223,10 @@ async function handleDelete(id: string) {
 
 .content-item:last-child {
   border-bottom: none;
+}
+
+.content-item.clickable {
+  cursor: pointer;
 }
 
 .content-item:hover {
@@ -265,5 +319,20 @@ async function handleDelete(id: string) {
 
 .btn-icon.danger:hover {
   color: var(--color-danger);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-bar {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--color-danger);
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
 }
 </style>

@@ -13,6 +13,7 @@ class TrendingNote(BaseModel):
     url: str = ""
     likes: int = 0
     author: str = ""
+    cover_url: str = ""
 
 
 class TrendingResponse(BaseModel):
@@ -24,8 +25,9 @@ class TrendingResponse(BaseModel):
 @hot_topics_router.post("/explore", response_model=TrendingResponse)
 async def explore_trending(account_id: str, keyword: str = ""):
     """Scrape trending notes from Xiaohongshu explore/search page."""
+    ctx = None
     try:
-        ctx = await browser_manager.get_context(account_id)
+        ctx = await browser_manager.get_temp_context(account_id)
         page = await ctx.new_page()
 
         if keyword:
@@ -36,7 +38,6 @@ async def explore_trending(account_id: str, keyword: str = ""):
         await page.goto(url, wait_until="domcontentloaded")
         await asyncio.sleep(4)
 
-        # Scroll to load more
         for _ in range(3):
             await page.evaluate("window.scrollBy(0, 800)")
             await asyncio.sleep(1)
@@ -48,6 +49,7 @@ async def explore_trending(account_id: str, keyword: str = ""):
                 const linkEl = card.querySelector('a[href*="/explore/"], a[href*="/discovery/"]');
                 const authorEl = card.querySelector('.author, .name, [class*="author"]');
                 const likeEl = card.querySelector('.like-count, [class*="like"] span, .count');
+                const imgEl = card.querySelector('img[src*="xhscdn"], img[src*="sns-img"], img');
 
                 const likeText = likeEl?.textContent?.replace(/[^0-9.万k]/gi, '') || '0';
                 let likes = 0;
@@ -64,6 +66,7 @@ async def explore_trending(account_id: str, keyword: str = ""):
                     url: linkEl?.href || '',
                     author: authorEl?.textContent?.trim() || '',
                     likes: likes,
+                    cover_url: imgEl?.src || '',
                 };
             }).filter(n => n.title);
         }""")
@@ -79,13 +82,17 @@ async def explore_trending(account_id: str, keyword: str = ""):
         return TrendingResponse(success=True, notes=notes)
     except Exception as e:
         return TrendingResponse(success=False, message=str(e))
+    finally:
+        if ctx:
+            await ctx.close()
 
 
 @hot_topics_router.post("/competitor", response_model=TrendingResponse)
 async def analyze_competitor(account_id: str, competitor_url: str):
     """Scrape a competitor's profile to see their top performing content."""
+    ctx = None
     try:
-        ctx = await browser_manager.get_context(account_id)
+        ctx = await browser_manager.get_temp_context(account_id)
         page = await ctx.new_page()
         await page.goto(competitor_url, wait_until="domcontentloaded")
         await asyncio.sleep(4)
@@ -130,3 +137,6 @@ async def analyze_competitor(account_id: str, competitor_url: str):
         return TrendingResponse(success=True, notes=notes)
     except Exception as e:
         return TrendingResponse(success=False, message=str(e))
+    finally:
+        if ctx:
+            await ctx.close()

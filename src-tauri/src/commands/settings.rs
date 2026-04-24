@@ -9,9 +9,21 @@ pub struct AppSettings {
     pub auto_start: bool,
     pub ai_provider: String,
     pub ai_api_key: String,
+    #[serde(default)]
+    pub ai_base_url: String,
+    #[serde(default = "default_ai_model")]
+    pub ai_model: String,
     pub default_proxy: Option<String>,
     pub comment_check_interval: u32,
     pub data_collect_interval: u32,
+    #[serde(default)]
+    pub asset_folder: String,
+    #[serde(default)]
+    pub pexels_api_key: String,
+}
+
+fn default_ai_model() -> String {
+    "gpt-4o-mini".to_string()
 }
 
 impl Default for AppSettings {
@@ -21,9 +33,13 @@ impl Default for AppSettings {
             auto_start: false,
             ai_provider: "openai".to_string(),
             ai_api_key: String::new(),
+            ai_base_url: String::new(),
+            ai_model: "gpt-4o-mini".to_string(),
             default_proxy: None,
             comment_check_interval: 30,
             data_collect_interval: 480,
+            asset_folder: String::new(),
+            pexels_api_key: String::new(),
         }
     }
 }

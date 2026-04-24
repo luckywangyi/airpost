@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import { MessageSquare, Reply, Bot } from 'lucide-vue-next'
 import { useSidecar } from '@/composables/useSidecar'
 import { useAccountStore } from '@/stores/accounts'
 
 const { callSidecar } = useSidecar()
 const accountStore = useAccountStore()
+const aiApiKey = ref('')
+const aiBaseUrl = ref('')
+const aiModel = ref('gpt-4o-mini')
 
 interface CommentItem {
   id: string
@@ -27,8 +31,16 @@ const checking = ref(false)
 const selectedAccount = ref('')
 const noteUrl = ref('')
 
-onMounted(() => {
+onMounted(async () => {
   accountStore.fetchAccounts()
+  try {
+    const s = await invoke<Record<string, unknown>>('get_settings')
+    aiApiKey.value = (s.ai_api_key as string) || ''
+    aiBaseUrl.value = (s.ai_base_url as string) || ''
+    aiModel.value = (s.ai_model as string) || 'gpt-4o-mini'
+  } catch {
+    // settings not available
+  }
 })
 
 function startReply(id: string) {
@@ -71,8 +83,15 @@ async function handleAiReply(commentId: string) {
   const c = comments.value.find(c => c.id === commentId)
   if (!c) return
   try {
+    const params = new URLSearchParams({
+      comment_text: c.text,
+      tone: '友好',
+      ...(aiApiKey.value && { api_key: aiApiKey.value }),
+      ...(aiBaseUrl.value && { base_url: aiBaseUrl.value }),
+      ...(aiModel.value && { model: aiModel.value }),
+    })
     const result = await callSidecar<{ success: boolean; reply: string }>(
-      `/ai/generate_reply?comment_text=${encodeURIComponent(c.text)}&tone=友好`,
+      `/ai/generate_reply?${params.toString()}`,
     )
     if (result.success) {
       replyDraft.value = result.reply

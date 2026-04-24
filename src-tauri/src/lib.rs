@@ -13,6 +13,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -80,10 +81,13 @@ pub fn run() {
             commands::account::update_account,
             commands::account::delete_account,
             commands::content::get_content_queue,
+            commands::content::get_content_by_id,
             commands::content::add_content,
+            commands::content::update_content,
             commands::content::update_content_status,
             commands::content::delete_content,
             commands::analytics::get_note_stats,
+            commands::analytics::add_note_stats,
             commands::analytics::get_task_logs,
             commands::settings::get_settings,
             commands::settings::save_settings,

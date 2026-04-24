@@ -29,12 +29,29 @@ export const useContentStore = defineStore('content', () => {
     }
   }
 
+  async function resetStalePublishing() {
+    const stale = queue.value.filter(i => i.status === 'publishing')
+    for (const item of stale) {
+      await updateStatus(item.id, 'pending')
+    }
+  }
+
   async function addContent(item: ContentItem) {
     try {
       await invoke('add_content', { item })
       await fetchQueue()
     } catch (e) {
       console.error('Failed to add content:', e)
+      throw e
+    }
+  }
+
+  async function updateContent(item: ContentItem) {
+    try {
+      await invoke('update_content', { item })
+      await fetchQueue()
+    } catch (e) {
+      console.error('Failed to update content:', e)
       throw e
     }
   }
@@ -59,5 +76,5 @@ export const useContentStore = defineStore('content', () => {
     }
   }
 
-  return { queue, loading, fetchQueue, addContent, updateStatus, deleteContent }
+  return { queue, loading, fetchQueue, resetStalePublishing, addContent, updateContent, updateStatus, deleteContent }
 })

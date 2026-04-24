@@ -32,9 +32,10 @@ class ReplyRequest(BaseModel):
 
 @commenter_router.post("/check", response_model=CommentCheckResponse)
 async def check_comments(account_id: str, note_url: str):
-    """Fetch comments from a note."""
+    """Fetch comments from a note (runs headless)."""
+    ctx = None
     try:
-        ctx = await browser_manager.get_context(account_id)
+        ctx = await browser_manager.get_temp_context(account_id)
         page = await ctx.new_page()
         await page.goto(note_url, wait_until="domcontentloaded")
         await asyncio.sleep(3)
@@ -50,19 +51,26 @@ async def check_comments(account_id: str, note_url: str):
         }""")
 
         await page.close()
+        await ctx.close()
         return CommentCheckResponse(
             success=True,
             comments=[Comment(**c) for c in comments_data],
         )
     except Exception as e:
+        if ctx:
+            try:
+                await ctx.close()
+            except Exception:
+                pass
         return CommentCheckResponse(success=False, message=str(e))
 
 
 @commenter_router.post("/reply")
 async def reply_comment(req: ReplyRequest):
-    """Reply to a specific comment on a note."""
+    """Reply to a specific comment on a note (runs headless)."""
+    ctx = None
     try:
-        ctx = await browser_manager.get_context(req.account_id, req.proxy)
+        ctx = await browser_manager.get_temp_context(req.account_id, req.proxy)
         page = await ctx.new_page()
         await page.goto(req.note_url, wait_until="domcontentloaded")
         await asyncio.sleep(3)
@@ -102,8 +110,13 @@ async def reply_comment(req: ReplyRequest):
                     await send_btn.click()
                     await asyncio.sleep(2)
 
-        await browser_manager.save_cookies(req.account_id)
         await page.close()
+        await ctx.close()
         return {"success": replied, "message": "回复成功" if replied else "未找到目标评论"}
     except Exception as e:
+        if ctx:
+            try:
+                await ctx.close()
+            except Exception:
+                pass
         return {"success": False, "message": str(e)}

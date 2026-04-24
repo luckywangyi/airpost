@@ -23,7 +23,7 @@ const router = createRouter({
       component: () => import('@/views/ContentQueue.vue'),
     },
     {
-      path: '/content/editor',
+      path: '/content/editor/:id?',
       name: 'content-editor',
       component: () => import('@/views/ContentEditor.vue'),
     },

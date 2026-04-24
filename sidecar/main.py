@@ -12,6 +12,7 @@ from core.scraper import scraper_router
 from core.analyzer import analyzer_router
 from core.hot_topics import hot_topics_router
 from core.pipeline import pipeline_router
+from core.strategy import strategy_router
 from ai.content_gen import ai_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
@@ -33,6 +34,7 @@ app.include_router(scraper_router, prefix="/scraper", tags=["scraper"])
 app.include_router(analyzer_router, prefix="/analyzer", tags=["analyzer"])
 app.include_router(hot_topics_router, prefix="/trending", tags=["trending"])
 app.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
+app.include_router(strategy_router, prefix="/strategy", tags=["strategy"])
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
 app.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 

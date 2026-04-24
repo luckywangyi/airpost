@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { useContentStore, type ContentItem } from '@/stores/content'
 import { useAccountStore } from '@/stores/accounts'
 import { useSidecar } from '@/composables/useSidecar'
 import { ArrowLeft, Sparkles, Upload, X, TrendingUp } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
 const { callSidecar } = useSidecar()
 const contentStore = useContentStore()
 const accountStore = useAccountStore()
+
+const editId = ref<string | null>(null)
+const isEditMode = computed(() => !!editId.value)
 
 const title = ref('')
 const body = ref('')
@@ -20,9 +26,46 @@ const imagePaths = ref<string[]>([])
 const generating = ref(false)
 const contentScore = ref(0)
 const scoreBreakdown = ref<Record<string, number>>({})
+const errorMessage = ref('')
 
-onMounted(() => {
+interface AiSettings {
+  ai_api_key: string
+  ai_base_url: string
+  ai_model: string
+}
+
+const aiSettings = ref<AiSettings>({ ai_api_key: '', ai_base_url: '', ai_model: 'gpt-4o-mini' })
+
+onMounted(async () => {
   accountStore.fetchAccounts()
+  try {
+    const s = await invoke<Record<string, unknown>>('get_settings')
+    aiSettings.value = {
+      ai_api_key: (s.ai_api_key as string) || '',
+      ai_base_url: (s.ai_base_url as string) || '',
+      ai_model: (s.ai_model as string) || 'gpt-4o-mini',
+    }
+  } catch {
+    // settings not available
+  }
+
+  const id = route.params.id as string | undefined
+  if (id) {
+    try {
+      const item = await invoke<ContentItem | null>('get_content_by_id', { id })
+      if (item) {
+        editId.value = item.id
+        title.value = item.title
+        body.value = item.body
+        tags.value = item.tags
+        selectedAccount.value = item.account_id
+        scheduledAt.value = item.scheduled_at || ''
+        imagePaths.value = item.images ? item.images.split(',').filter(Boolean) : []
+      }
+    } catch {
+      // content not found
+    }
+  }
 })
 
 function generateId(): string {
@@ -31,18 +74,34 @@ function generateId(): string {
 
 async function handleSave() {
   if (!title.value.trim() || !selectedAccount.value) return
-  const item: ContentItem = {
-    id: generateId(),
-    account_id: selectedAccount.value,
-    title: title.value.trim(),
-    body: body.value.trim(),
-    tags: tags.value.trim(),
-    images: imagePaths.value.join(','),
-    scheduled_at: scheduledAt.value || null,
-    status: 'pending',
-    created_at: new Date().toISOString(),
+
+  if (isEditMode.value) {
+    const item: ContentItem = {
+      id: editId.value!,
+      account_id: selectedAccount.value,
+      title: title.value.trim(),
+      body: body.value.trim(),
+      tags: tags.value.trim(),
+      images: imagePaths.value.join(','),
+      scheduled_at: scheduledAt.value || null,
+      status: 'pending',
+      created_at: '',
+    }
+    await contentStore.updateContent(item)
+  } else {
+    const item: ContentItem = {
+      id: generateId(),
+      account_id: selectedAccount.value,
+      title: title.value.trim(),
+      body: body.value.trim(),
+      tags: tags.value.trim(),
+      images: imagePaths.value.join(','),
+      scheduled_at: scheduledAt.value || null,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    }
+    await contentStore.addContent(item)
   }
-  await contentStore.addContent(item)
   router.push('/content')
 }
 
@@ -50,9 +109,34 @@ function removeImage(index: number) {
   imagePaths.value.splice(index, 1)
 }
 
+async function handlePickImages() {
+  try {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+    })
+    if (selected) {
+      const paths = Array.isArray(selected) ? selected : [selected]
+      imagePaths.value.push(...paths)
+    }
+  } catch (e) {
+    console.error('Failed to pick images:', e)
+  }
+}
+
 async function handleAiGenerate() {
-  if (!title.value.trim()) return
+  if (!title.value.trim()) {
+    errorMessage.value = '请先输入标题/主题'
+    setTimeout(() => { errorMessage.value = '' }, 3000)
+    return
+  }
+  if (!aiSettings.value.ai_api_key) {
+    errorMessage.value = '请先在设置中配置 AI API Key'
+    setTimeout(() => { errorMessage.value = '' }, 5000)
+    return
+  }
   generating.value = true
+  errorMessage.value = ''
   try {
     const result = await callSidecar<{
       success: boolean
@@ -66,17 +150,24 @@ async function handleAiGenerate() {
       body: {
         topic: title.value.trim(),
         account_id: selectedAccount.value || undefined,
+        api_key: aiSettings.value.ai_api_key,
+        base_url: aiSettings.value.ai_base_url || undefined,
+        model: aiSettings.value.ai_model || 'gpt-4o-mini',
       },
     })
     if (result.success) {
-      title.value = result.title
+      title.value = result.title.length > 20 ? result.title.slice(0, 19) + '…' : result.title
       body.value = result.body
       tags.value = result.tags.map(t => `#${t}`).join(' ')
       contentScore.value = result.score
       scoreBreakdown.value = result.score_breakdown || {}
+    } else {
+      errorMessage.value = result.message || 'AI 生成失败'
+      setTimeout(() => { errorMessage.value = '' }, 5000)
     }
-  } catch (e) {
-    console.error('AI generation failed:', e)
+  } catch (e: any) {
+    errorMessage.value = e?.message || 'AI 生成失败，请检查网络和 API 配置'
+    setTimeout(() => { errorMessage.value = '' }, 5000)
   } finally {
     generating.value = false
   }
@@ -109,15 +200,17 @@ async function handlePublishNow() {
       <button class="btn-back" @click="router.push('/content')">
         <ArrowLeft :size="18" :stroke-width="1.5" />
       </button>
-      <h1 class="page-title">新建内容</h1>
+      <h1 class="page-title">{{ isEditMode ? '编辑内容' : '新建内容' }}</h1>
       <div class="header-actions">
         <button class="btn-secondary" :disabled="generating" @click="handleAiGenerate">
           <Sparkles :size="14" :stroke-width="1.5" />
           {{ generating ? '生成中...' : 'AI 生成' }}
         </button>
-        <button class="btn-primary" @click="handleSave">保存到队列</button>
+        <button class="btn-primary" @click="handleSave">{{ isEditMode ? '保存修改' : '保存到队列' }}</button>
       </div>
     </header>
+
+    <div v-if="errorMessage" class="error-bar">{{ errorMessage }}</div>
 
     <div class="editor-layout">
       <div class="editor-main">
@@ -146,7 +239,7 @@ async function handlePublishNow() {
                 <X :size="12" :stroke-width="2" />
               </button>
             </div>
-            <div class="upload-placeholder">
+            <div class="upload-placeholder" @click="handlePickImages">
               <Upload :size="20" :stroke-width="1.5" />
               <span>添加图片</span>
             </div>
@@ -456,5 +549,15 @@ async function handlePublishNow() {
   font-size: 11px;
   font-weight: 600;
   color: var(--color-success);
+}
+
+.error-bar {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--color-danger);
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
 }
 </style>

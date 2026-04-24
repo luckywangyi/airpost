@@ -52,6 +52,7 @@ async function handleLogin(account: Account) {
       statusMessage.value = '登录成功!'
       await accountStore.updateAccount({
         ...account,
+        status: 'active',
         last_login: new Date().toISOString(),
         nickname: result.nickname || account.nickname,
       })
